@@ -3,6 +3,7 @@ import argparse
 
 # Modules
 import average
+import SVM
 
 # Defined constants
 ESBL_AB_RESISTENCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"]
@@ -20,12 +21,15 @@ def main(args):
         return
     if args.average:
         average.run(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTENCE_LIST)
+    elif args.svm:
+        pass
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-file', type=str, help='File to use for analysis')
     parser.add_argument('-testfile', action='store_true', help='Use data/sample.csv')
     parser.add_argument('-average', action='store_true', help='Print results from baseline analysis method')
+    parser.add_argument('-SVM', action='store_true', help='Print results from SVM method')
     parser.add_argument('-culture_cutoff', type=int, help='Used by average: Determines the minimum amount of cultures per patient', default=5)
     parser.add_argument('-ab_count_cutoff', type=int, help='Used by average: Determines the minimum count of AB culture occurences', default=20)
     main(parser.parse_args())
