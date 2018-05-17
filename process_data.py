@@ -45,8 +45,11 @@ def filter_ab(patient_data, relevant_ab_list, ab_dict, esbl_result, numeric):
         esbl_patient_data.append(patient_ab)
     return esbl_patient_data
 
-def percentage_split(train_data, test_data, esbl_patient_data, split_percentage=10):
+def percentage_split(train_data, test_data, esbl_patient_data, split_percentage=10, break_limit=-1):
+    break_count = 0
     for data_row in esbl_patient_data:
+        if break_count == break_limit: break
+        break_count+=1
         if randint(0, 100) <= split_percentage:
             test_data.append(data_row)
         else:
@@ -86,7 +89,7 @@ def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RE
                 esbl_found = True
                 # Remove this break if you want to include the cultures of the day
                 # where the patient had the ESBL producing microorganism.
-                break
+                break 
             else:
                 if result is 'S':
                     ab_vector[ab_dict[ab]] = 'S'
