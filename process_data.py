@@ -17,20 +17,31 @@ def count_ab(esbl_patient_data, ab_names):
                     ab_count[ab_index][1]+=1
     return ab_count
 
-def relevant_ab(esbl_pos_ab_count, AB_CULTURE_COUNT_CUTOFF):
+def relevant_ab(esbl_pos_ab_count, ab_dict, ab_names, AB_CULTURE_COUNT_CUTOFF):
     relevant_ab_list = []
-    for ab_index in range(len(esbl_pos_ab_count)):
+    for ab in ab_names:
+        ab_index = ab_dict[ab]
         if esbl_pos_ab_count[ab_index][1] > AB_CULTURE_COUNT_CUTOFF:
-            relevant_ab_list.append(ab_index)
+            relevant_ab_list.append(ab)
     return relevant_ab_list
 
-def filter_ab(patient_data, relevant_ab_list, esbl_result):
+def filter_ab(patient_data, relevant_ab_list, ab_dict, esbl_result, numeric):
     esbl_patient_data = []
     for row in patient_data:
         patient_ab = []
-        for ab_index in relevant_ab_list:
-            patient_ab.append(row[ab_index])
-        patient_ab.append(esbl_result)
+        for ab in relevant_ab_list:
+            ab_result = row[ab_dict[ab]]
+            if numeric:
+                value = 0
+                if ab_result is 'S':
+                    value = 1
+                elif ab_result is 'R':
+                    value = -1
+                patient_ab.append(value)
+            else:
+                patient_ab.append(row[ab_dict[ab]])
+        if esbl_result is not None:
+            patient_ab.append(esbl_result)
         esbl_patient_data.append(patient_ab)
     return esbl_patient_data
 
@@ -41,7 +52,6 @@ def percentage_split(train_data, test_data, esbl_patient_data, split_percentage=
         else:
             train_data.append(data_row)
     return train_data, test_data 
-
 
 def find_esbl_pos_day(patient_data, ESBL_AB_RESISTENCE_LIST):
     for culture in patient_data:
