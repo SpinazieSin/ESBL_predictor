@@ -17,11 +17,11 @@ def count_ab(esbl_patient_data, ab_names):
                     ab_count[ab_index][1]+=1
     return ab_count
 
-def relevant_ab(esbl_pos_ab_count, ab_dict, ab_names, AB_CULTURE_COUNT_CUTOFF):
+def relevant_ab(esbl_pos_ab_count, ab_dict, ab_names, RELATIVE_AB_CULTURE_COUNT_CUTOFF):
     relevant_ab_list = []
     for ab in ab_names:
         ab_index = ab_dict[ab]
-        if esbl_pos_ab_count[ab_index][1] > AB_CULTURE_COUNT_CUTOFF:
+        if esbl_pos_ab_count[ab_index][1] > RELATIVE_AB_CULTURE_COUNT_CUTOFF:
             relevant_ab_list.append(ab)
     return relevant_ab_list
 
@@ -45,22 +45,31 @@ def filter_ab(patient_data, relevant_ab_list, ab_dict, esbl_result, numeric):
         esbl_patient_data.append(patient_ab)
     return esbl_patient_data
 
-def percentage_split(train_data, test_data, esbl_patient_data, split_percentage=10, break_limit=-1):
+def percentage_split(train_data, test_data, esbl_patient_data, split_percentage=20, break_limit=-1, random_sampling=False):
     break_count = 0
-    for data_row in esbl_patient_data:
-        if break_count == break_limit: break
-        break_count+=1
-        if randint(0, 100) <= split_percentage:
-            test_data.append(data_row)
-        else:
-            train_data.append(data_row)
+    if break_limit > 0 and random_sampling:
+        data_length = len(esbl_patient_data)-1
+        for i in range(break_limit):
+            if randint(0, 100) <= split_percentage:
+                test_data.append(esbl_patient_data[randint(0, data_length)])
+            else:
+                train_data.append(esbl_patient_data[randint(0, data_length)])
+    else:
+        for data_row in esbl_patient_data:
+            if break_count == break_limit: break
+            break_count+=1
+            if randint(0, 100) <= split_percentage:
+                test_data.append(data_row)
+            else:
+                train_data.append(data_row)
     return train_data, test_data 
 
 def find_esbl_pos_day(patient_data, ESBL_AB_RESISTENCE_LIST):
     for culture in patient_data:
         ab = culture[1]
         result = culture[2]
-        if (ab in ESBL_AB_RESISTENCE_LIST and result is not 'S'):
+        bepaling = culture[3]
+        if (ab in ESBL_AB_RESISTENCE_LIST and result is not 'S' and "M_banaal_BK" in bepaling):
             return culture[0]
     return None
 
@@ -80,25 +89,43 @@ def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RE
         ab_vector = [None for x in range(ab_length)]
 
         esbl_pos_day = find_esbl_pos_day(patient_data, ESBL_AB_RESISTENCE_LIST)
+        previous_culture_day = None
 
         for culture in patient_data:
+
             culture_day = culture[0]
             ab = culture[1]
             result = culture[2]
+
             if culture_day == esbl_pos_day:
                 esbl_found = True
                 # Remove this break if you want to include the cultures of the day
                 # where the patient had the ESBL producing microorganism.
-                break 
-            else:
+                break
+
+            if (previous_culture_day != culture_day):
+                previous_culture_day = culture_day
+            skip = False
+            if (previous_culture_day is not None and esbl_pos_day is not None):
+                total_days= abs((previous_culture_day-esbl_pos_day).days)
+                if (total_days < 10):
+                    pass
+                    skip = True
+
+            if not skip:
                 if result is 'S':
                     ab_vector[ab_dict[ab]] = 'S'
                 else:
                     ab_vector[ab_dict[ab]] = 'R'
 
+            
         if np.count_nonzero(ab_vector) > 0:
             if esbl_found:
                 esbl_pos_patient_data.append(ab_vector)
             else:
                 esbl_neg_patient_data.append(ab_vector)
+
+    print("Training on:")
+    print("ESBL Positive patients: " + str(len(esbl_pos_patient_data)))
+    print("ESBL Negative patients: " + str(len(esbl_neg_patient_data)))
     return esbl_pos_patient_data, esbl_neg_patient_data
