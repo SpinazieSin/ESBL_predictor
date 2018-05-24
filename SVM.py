@@ -18,6 +18,7 @@ def run_cross_validation(esbl_pos_patient_data, esbl_neg_patient_data, cross_val
     for iteration in range(cross_validation):
         if iteration%10 is 0:
             print(str(iteration) + " ...")
+
         pos_train_data, pos_test_data = process_data.percentage_split([], [], esbl_pos_patient_data)
         if len(pos_test_data) < 1: continue
         neg_train_data, neg_test_data = process_data.percentage_split([], [], esbl_neg_patient_data)
@@ -41,14 +42,14 @@ def run(filename, CULTURE_SIZE_CUTOFF, AB_CULTURE_COUNT_CUTOFF, ESBL_AB_RESISTEN
     ab_dict = csv_data[1]
     ab_names = ab_dict.keys()
 
-    esbl_pos_patient_data, esbl_neg_patient_data = process_data.generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTENCE_LIST)
-
-    esbl_pos_ab_count = process_data.count_ab(esbl_pos_patient_data, ab_names)
-    esbl_neg_ab_count = process_data.count_ab(esbl_neg_patient_data, ab_names)
-    relevant_ab_list = process_data.relevant_ab(esbl_pos_ab_count, ab_dict, ab_names, AB_CULTURE_COUNT_CUTOFF)
-
-    esbl_pos_patient_data = process_data.filter_ab(esbl_pos_patient_data, relevant_ab_list, ab_dict, None, numeric=True)
-    esbl_neg_patient_data = process_data.filter_ab(esbl_neg_patient_data, relevant_ab_list, ab_dict, None, numeric=True)
+    esbl_pos_patient_data, esbl_neg_patient_data = process_data.generate_data(patient_data=id_dict,
+                                                                                           ab_data=ab_dict,
+                                                                                           ab_names=ab_names,
+                                                                                           AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
+                                                                                           CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
+                                                                                           ESBL_AB_RESISTENCE_LIST=ESBL_AB_RESISTENCE_LIST,
+                                                                                           esbl_result_format=None,
+                                                                                           numeric=True)
 
     print("Running cross validation " + str(cross_validation) + " times ...")
     pos_predictor_result, neg_predictor_result = run_cross_validation(esbl_pos_patient_data, esbl_neg_patient_data, cross_validation)
