@@ -72,8 +72,21 @@ class Perceptron():
                     iteration_result.append(["POS", row[1]])
 
             predictor_result.append(iteration_result)
+
+        # Process results
+        patient_pos_probability = []
+        patient_certainty = []
+        for patient_index in range(len(self.patient_list)):
+            pos_count = 0
+            certainty_sum = 0
+            for iteration_result in predictor_result:
+                if iteration_result[patient_index][0] == "POS":
+                    pos_count+=1
+                    certainty_sum+=iteration_result[patient_index][1]
+            patient_pos_probability.append(pos_count/float(len(predictor_result)))
+            patient_certainty.append(certainty_sum/float(len(predictor_result)))
         
-        return predictor_result
+        return patient_pos_probability, patient_certainty
 
 
     def run(self):        
@@ -92,19 +105,27 @@ class Perceptron():
             print("Standard deviation of Esbl neg: " + str(np.std(neg_predictor_result)))
         
         elif self.testmode == "test_patient":
-            self.patient_list = [self.data.esbl_pos_patient_data[0]]
+            self.patient_list = [self.data.esbl_pos_patient_data[3], self.data.esbl_neg_patient_data[2342]]
 
             temp = []
             for train_patient in self.data.esbl_pos_patient_data:
+                duplicate_value = False
                 for test_patient in self.patient_list:
-                    if test_patient != train_patient:
-                        temp.append(train_patient)
+                    if test_patient == train_patient:
+                        duplicate_value = True
+                if not duplicate_value: temp.append(train_patient)
 
             if len(temp) < len(self.data.esbl_pos_patient_data):
-                self.data.esbl_pos_patient_data = temp
                 print("Removed {} patient(s) from training data ...".format(len(self.data.esbl_pos_patient_data) - len(temp)))
+                self.data.esbl_pos_patient_data = temp
+                print("Now training on {} patients ...".format(len(self.data.esbl_pos_patient_data)))
 
             print("Running on test set of {} patient(s) ...".format(len(self.patient_list)))
-            predictor_result = self.run_single_patient()
+
+            patient_pos_probability, patient_certainty = self.run_single_patient()
+
             print("RESULTS OF MULTILAYER PERCEPTRON:")
-            print(predictor_result)
+            for patient_index in range(len(patient_pos_probability)):
+                print("-Patient {}".format(patient_index))
+                print("Esbl pos probability: {}".format(patient_pos_probability[patient_index]))
+                print("with certainty: {}".format(patient_certainty[patient_index]))
