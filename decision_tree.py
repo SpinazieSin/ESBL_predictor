@@ -14,9 +14,10 @@ class DecisionTree():
                        CULTURE_SIZE_CUTOFF=0,
                        AB_CULTURE_COUNT_CUTOFF=0,
                        ESBL_AB_RESISTENCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
-                       cross_validation=100,
+                       cross_validation=300,
                        testmode="cross_validation"):
-        self.data = data.Representation(filename)
+        self.filename = filename
+        self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
                                          AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
                                          ESBL_AB_RESISTENCE_LIST=ESBL_AB_RESISTENCE_LIST)
@@ -89,8 +90,9 @@ class DecisionTree():
         return patient_pos_probability, patient_certainty
 
     def run(self):
-        print("Converting data ...")
+        self.data.load_culture_data(self.filename)
 
+        print("Converting data ...")
         self.data.load_filtered_esbl_patient_data()
 
         if self.testmode == "cross_validation":

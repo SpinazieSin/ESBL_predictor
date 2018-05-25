@@ -3,14 +3,8 @@ import process_data
 
 class Representation():
     """docstring for Representation"""
-    def __init__(self, filename):
-        self.filename = filename
-        self.csv_data = data_reader.read_csv(filename)
-        self.id_dict = self.csv_data[0]
-        self.ab_dict = self.csv_data[1]
-        self.ab_names = self.ab_dict.keys()
-        self.esbl_pos_patient_data = []
-        self.esbl_neg_patient_data = []
+    def __init__(self):
+        self.patient_dict = {}
 
     def set_culture_parameters(self, CULTURE_SIZE_CUTOFF=0,
                                      AB_CULTURE_COUNT_CUTOFF=0,
@@ -37,3 +31,9 @@ class Representation():
                                                                                             self.ESBL_AB_RESISTENCE_LIST,
                                                                                             esbl_result_format=esbl_result_format,
                                                                                             numeric=numeric)
+
+    def load_culture_data(self, filename):
+        self.csv_data = data_reader.read_csv(filename)
+        self.id_dict = self.csv_data[0]
+        self.ab_dict = self.csv_data[1]
+        self.ab_names = self.ab_dict.keys()

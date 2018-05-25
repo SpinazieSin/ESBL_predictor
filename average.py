@@ -9,15 +9,20 @@ import process_data
 
 class Average():
     def __init__(self, filename, CULTURE_SIZE_CUTOFF=0, AB_CULTURE_COUNT_CUTOFF=0, ESBL_AB_RESISTENCE_LIST=[]):
-        self.data = data.Representation(filename)
+        self.filename = filename
+        self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF, AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF)
         self.esbl_pos_ab_count = []
         self.esbl_neg_ab_count = []
 
 
     def run(self):
+        self.data.load_culture_data(self.filename)
+
         print("Converting data ...")
         self.data.load_esbl_patient_data()
+
+        self.data.set_RELATIVE_AB_CULTURE_COUNT_CUTOFF()
 
         self.esbl_pos_ab_count = process_data.count_ab(self.data.esbl_pos_patient_data, self.data.ab_names)
         self.esbl_neg_ab_count = process_data.count_ab(self.data.esbl_neg_patient_data, self.data.ab_names)

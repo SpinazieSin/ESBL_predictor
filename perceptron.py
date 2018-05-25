@@ -9,14 +9,14 @@ import data_reader
 import process_data
 
 class Perceptron():
-    """docstring for Perceptron"""
     def __init__(self, filename,
                        CULTURE_SIZE_CUTOFF=0,
                        AB_CULTURE_COUNT_CUTOFF=0,
                        ESBL_AB_RESISTENCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
                        cross_validation=100,
                        testmode="cross_validation"):
-        self.data = data.Representation(filename)
+        self.filename = filename
+        self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
                                          AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
                                          ESBL_AB_RESISTENCE_LIST=ESBL_AB_RESISTENCE_LIST)
@@ -32,16 +32,20 @@ class Perceptron():
             if iteration%10 is 0:
                 print(str(iteration) + " ...")
 
+            # Split dataset into train and test
             train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.data,
                                                                                                          break_amount=1.2,
                                                                                                          split_percentage=20)
 
+            # Train percpetron on training set
             clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(len(self.data.ab_names), 2), random_state=1)
             clf.fit(train_data, train_labels)
 
+            # Test the classification on a test and control set
             pos_pred_test = clf.predict(pos_test_data)
             neg_pred_test = clf.predict(neg_test_data)
 
+            # Calculate accuracy and store it
             pos_predictor_result.append(len([1 for x in pos_pred_test if x == "POS"])/float(len(pos_pred_test)))
             neg_predictor_result.append(len([1 for x in neg_pred_test if x == "NEG"])/float(len(neg_pred_test)))
 
@@ -55,15 +59,19 @@ class Perceptron():
             if iteration%10 is 0:
                 print(str(iteration) + " ...")
 
+            # Create training set (split percentage is 0)
             train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.data,
                                                                                                          break_amount=1,
                                                                                                          split_percentage=0)
 
+            # Train a perceptron classifier
             clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(15, 5), random_state=1)
             clf.fit(train_data, train_labels)
 
+            # Output prediction probabilities
             pred_test_probabilities = clf.predict_proba(self.patient_list)
 
+            # Append labels
             iteration_result = []
             for row in pred_test_probabilities:
                 if row[0] > row[1]:
@@ -73,7 +81,7 @@ class Perceptron():
 
             predictor_result.append(iteration_result)
 
-        # Process results
+        # Process results, sums over all suscebtible and certainty values per patient
         patient_pos_probability = []
         patient_certainty = []
         for patient_index in range(len(self.patient_list)):
@@ -89,13 +97,15 @@ class Perceptron():
         return patient_pos_probability, patient_certainty
 
 
-    def run(self):        
-        print("Converting data ...")
+    def run(self):
+        self.data.load_culture_data(self.filename)
 
+        print("Converting data ...")
         self.data.load_filtered_esbl_patient_data()
 
         if self.testmode == "cross_validation":
             print("Running cross validation " + str(self.cross_validation) + " times ...")
+            
             pos_predictor_result, neg_predictor_result = self.run_cross_validation()
             
             print("RESULTS OF MULTILAYER PERCEPTRON:")
@@ -105,8 +115,10 @@ class Perceptron():
             print("Standard deviation of Esbl neg: " + str(np.std(neg_predictor_result)))
         
         elif self.testmode == "test_patient":
+            # Pick a patient
             self.patient_list = [self.data.esbl_pos_patient_data[3], self.data.esbl_neg_patient_data[2342]]
 
+            # Remove patient from training set
             temp = []
             for train_patient in self.data.esbl_pos_patient_data:
                 duplicate_value = False
@@ -115,6 +127,7 @@ class Perceptron():
                         duplicate_value = True
                 if not duplicate_value: temp.append(train_patient)
 
+            # If training set changed update it
             if len(temp) < len(self.data.esbl_pos_patient_data):
                 print("Removed {} patient(s) from training data ...".format(len(self.data.esbl_pos_patient_data) - len(temp)))
                 self.data.esbl_pos_patient_data = temp
