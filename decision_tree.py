@@ -13,14 +13,14 @@ class DecisionTree():
     def __init__(self, filename,
                        CULTURE_SIZE_CUTOFF=0,
                        AB_CULTURE_COUNT_CUTOFF=0,
-                       ESBL_AB_RESISTENCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
+                       ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
                        cross_validation=300,
                        testmode="cross_validation"):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
                                          AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
-                                         ESBL_AB_RESISTENCE_LIST=ESBL_AB_RESISTENCE_LIST)
+                                         ESBL_AB_RESISTANCE_LIST=ESBL_AB_RESISTANCE_LIST)
         self.cross_validation = cross_validation
         self.testmode = testmode
         self.patient_list = []
@@ -33,7 +33,8 @@ class DecisionTree():
             if iteration%10 is 0:
                 print(str(iteration) + " ...")
 
-            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.data,
+            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.pos_training_data,
+                                                                                                         self.neg_training_data,
                                                                                                          break_amount=1,
                                                                                                          split_percentage=10)
 
@@ -56,7 +57,8 @@ class DecisionTree():
             if iteration%10 is 0:
                 print(str(iteration) + " ...")
 
-            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.data,
+            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.pos_training_data,
+                                                                                                         self.neg_training_data,
                                                                                                          break_amount=1,
                                                                                                          split_percentage=0)
 
@@ -90,13 +92,22 @@ class DecisionTree():
         return patient_pos_probability, patient_certainty
 
     def run(self):
-        self.data.load_culture_data(self.filename)
 
-        print("Converting data ...")
-        self.data.load_filtered_esbl_patient_data()
+        if True:
+            self.data.load_culture_data(self.filename)
+            
+            print("Converting data ...")
+            self.data.load_filtered_esbl_patient_data()
+            self.pos_training_data = self.data.esbl_pos_patient_data
+            self.neg_training_data = self.data.esbl_neg_patient_data
+
+        else:
+            self.data.load_patient_data("data/sample2.csv", "data/sample.csv")
+            self.pos_training_data, self.neg_training_data = process_data.vectorize_medication_data(self.data.patient_dict)
 
         if self.testmode == "cross_validation":
             print("Running cross validation " + str(self.cross_validation) + " times ...")
+
             pos_predictor_result, neg_predictor_result = self.run_cross_validation()
            
             print("RESULTS OF TRAINING DECISION TREE:")

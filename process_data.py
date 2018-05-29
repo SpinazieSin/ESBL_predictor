@@ -6,6 +6,7 @@ from math import floor
 
 # Modules
 import data
+import patient_data
 
 def count_ab(esbl_patient_data, ab_names):
     ab_count = np.zeros((len(ab_names), 2))
@@ -15,7 +16,7 @@ def count_ab(esbl_patient_data, ab_names):
                 if ab_vector[ab_index] is 'S':
                     # Suscebtible count
                     ab_count[ab_index][0]+=1
-                    # Resistent count
+                    # Resistant count
                     ab_count[ab_index][1]+=1
                 elif ab_vector[ab_index] is 'R':
                     # Reistent count
@@ -69,60 +70,75 @@ def percentage_split(train_data, test_data, esbl_patient_data, split_percentage,
                 train_data.append(data_row)
     return train_data, test_data 
 
-def find_esbl_pos_day(patient_data, ESBL_AB_RESISTENCE_LIST):
+def find_esbl_pos_day(patient_data, ESBL_AB_RESISTANCE_LIST):
     for culture in patient_data:
         ab = culture[1]
         result = culture[2]
         bepaling = culture[3]
-        if (ab in ESBL_AB_RESISTENCE_LIST and result is not 'S' and "M_banaal_BK" in bepaling):
+        if (ab in ESBL_AB_RESISTANCE_LIST and result is not 'S' and "M_banaal_BK" in bepaling):
             return culture[0]
     return None
 
+def generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict, return_date=False, numeric=False):
+    esbl_found = False
+    patient_data.sort()
 
-def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTENCE_LIST):
+    if numeric:
+        ab_vector = np.zeros(ab_length)
+    else:
+        ab_vector = [None for x in range(ab_length)]
+
+    esbl_pos_day = find_esbl_pos_day(patient_data, ESBL_AB_RESISTANCE_LIST)
+    previous_culture_day = None
+
+    for culture in patient_data:
+
+        culture_day = culture[0]
+        ab = culture[1]
+        result = culture[2]
+        if culture_day == esbl_pos_day:
+            esbl_found = True
+            # Remove this break if you want to include the cultures of the day
+            # where the patient had the ESBL producing microorganism.
+            break
+
+        if (previous_culture_day != culture_day):
+            previous_culture_day = culture_day
+        skip = False
+        if (previous_culture_day is not None and esbl_pos_day is not None):
+            total_days= abs((previous_culture_day-esbl_pos_day).days)
+            if (total_days < 2 or total_days > 360):
+                pass
+                skip = True
+
+        if not skip:
+            if result is 'S':
+                if numeric:
+                    ab_vector[ab_dict[ab]] = 1
+                else:
+                    ab_vector[ab_dict[ab]] = 'S'
+            else:
+                if numeric:
+                    ab_vector[ab_dict[ab]] = -1
+                else:
+                    ab_vector[ab_dict[ab]] = 'R'
+    if return_date:
+        return ab_vector, esbl_found, esbl_pos_day
+    else:
+        return ab_vector, esbl_found
+
+def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST):
     esbl_pos_patient_data = []
     esbl_neg_patient_data = []
     ab_length = len(ab_dict.keys())
     
     for patient in id_dict.keys():
 
-        esbl_found = False
         patient_data = id_dict[patient]
         if len(patient_data) < CULTURE_SIZE_CUTOFF:
             continue
-        
-        patient_data.sort()
-        ab_vector = [None for x in range(ab_length)]
 
-        esbl_pos_day = find_esbl_pos_day(patient_data, ESBL_AB_RESISTENCE_LIST)
-        previous_culture_day = None
-
-        for culture in patient_data:
-
-            culture_day = culture[0]
-            ab = culture[1]
-            result = culture[2]
-            if culture_day == esbl_pos_day:
-                esbl_found = True
-                # Remove this break if you want to include the cultures of the day
-                # where the patient had the ESBL producing microorganism.
-                break
-
-            if (previous_culture_day != culture_day):
-                previous_culture_day = culture_day
-            skip = False
-            if (previous_culture_day is not None and esbl_pos_day is not None):
-                total_days= abs((previous_culture_day-esbl_pos_day).days)
-                if (total_days < 2 or total_days > 360):
-                    pass
-                    skip = True
-
-            if not skip:
-                if result is 'S':
-                    ab_vector[ab_dict[ab]] = 'S'
-                else:
-                    ab_vector[ab_dict[ab]] = 'R'
-
+        ab_vector, esbl_found = generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict)
             
         if np.count_nonzero(ab_vector) > 0:
             if esbl_found:
@@ -130,14 +146,14 @@ def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RE
             else:
                 esbl_neg_patient_data.append(ab_vector)
 
-    print("Training on:")
-    print("ESBL Positive patients: " + str(len(esbl_pos_patient_data)))
-    print("ESBL Negative patients: " + str(len(esbl_neg_patient_data)))
+    print("Found:")
+    print("Positive resistance patients: " + str(len(esbl_pos_patient_data)))
+    print("Negative resistance patients: " + str(len(esbl_neg_patient_data)))
     return esbl_pos_patient_data, esbl_neg_patient_data
 
-def generate_data(patient_data, ab_data, ab_names, AB_CULTURE_COUNT_CUTOFF, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTENCE_LIST, esbl_result_format=None, numeric=True):
+def generate_data(patient_data, ab_data, ab_names, AB_CULTURE_COUNT_CUTOFF, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST, esbl_result_format=None, numeric=True):
     
-    esbl_pos_patient_data, esbl_neg_patient_data = generate_esbl_patient_data(patient_data, ab_data, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTENCE_LIST)
+    esbl_pos_patient_data, esbl_neg_patient_data = generate_esbl_patient_data(patient_data, ab_data, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST)
 
     RELATIVE_AB_CULTURE_COUNT_CUTOFF = float(len(esbl_pos_patient_data))*(float(AB_CULTURE_COUNT_CUTOFF)/100)
 
@@ -150,7 +166,7 @@ def generate_data(patient_data, ab_data, ab_names, AB_CULTURE_COUNT_CUTOFF, CULT
 
     return esbl_pos_patient_data, esbl_neg_patient_data
 
-def generate_training_data(data_representation, break_amount=1, split_percentage=20):
+def generate_training_data(pos_patient_data, neg_patient_data, break_amount=1, split_percentage=20):
     while(True):
         train_data = []
         pos_test_data = []
@@ -158,16 +174,17 @@ def generate_training_data(data_representation, break_amount=1, split_percentage
 
         if break_amount == 1:
             train_data, pos_test_data = percentage_split([], [],
-                                                         data_representation.esbl_pos_patient_data,
-                                                         sample_count=int(break_amount*len(data_representation.esbl_pos_patient_data)),
+                                                         pos_patient_data,
+                                                         sample_count=int(break_amount*len(pos_patient_data)),
                                                          split_percentage=split_percentage)
         else:
             train_data_temp, pos_test_data = percentage_split([], [],
-                                                              data_representation.esbl_pos_patient_data,
-                                                              sample_count=int(break_amount*len(data_representation.esbl_pos_patient_data)),
+                                                              pos_patient_data,
+                                                              sample_count=int(break_amount*len(pos_patient_data)),
                                                               random_sampling=True, split_percentage=split_percentage)
             train_data = []
             for row in train_data_temp:
+                print(row)
                 if row not in pos_test_data:
                     train_data.append(row)
             pos_test_data.sort()
@@ -178,8 +195,8 @@ def generate_training_data(data_representation, break_amount=1, split_percentage
 
         # Data exists so append labels for all positive results
         train_labels = ["POS" for i in range(len(train_data))]
-        train_data, neg_test_data = percentage_split(train_data, [], data_representation.esbl_neg_patient_data, sample_count=len(train_labels), random_sampling=True, split_percentage=split_percentage)            
- 
+        train_data, neg_test_data = percentage_split(train_data, [], neg_patient_data, sample_count=len(train_labels), random_sampling=True, split_percentage=split_percentage)
+
         # control testing data needs to exist
         if (not neg_test_data and (split_percentage > 0 and split_percentage < 100)): continue
 
@@ -194,4 +211,37 @@ def generate_training_data(data_representation, break_amount=1, split_percentage
 
     return train_data, pos_test_data, neg_test_data, train_labels
 
+def count_dot(dates, limit=False):
+    if not limit:
+        return len(dates)
     
+    dot = 0
+    for date in dates:
+        if date < limit:
+            dot+=1
+
+    return dot
+
+def vectorize_medication_data(patient_dict):
+    pos_data = []
+    neg_data = []
+
+    for patient_id in patient_dict.keys():
+        current_patient = patient_dict[patient_id]
+        if current_patient.is_resistant:
+            pos_data.append(current_patient.medication_use)
+        else:
+            neg_data.append(current_patient.medication_use)
+    return pos_data, neg_data
+
+def vectorize_culture_data(patient_dict):
+    pos_data = []
+    neg_data = []
+
+    for patient_id in patient_dict.keys():
+        current_patient = patient_dict[patient_id]
+        if current_patient.is_resistant:
+            pos_data.append(current_patient.resistances)
+        else:
+            neg_data.append(current_patient.resistances)
+    return pos_data, neg_data

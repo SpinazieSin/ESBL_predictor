@@ -8,7 +8,7 @@ import decision_tree
 import perceptron
 
 # Defined constants
-ESBL_AB_RESISTENCE_LIST = ["cefotaxim", "ceftazidim"] # 3rde generatie cefalosporine resistentie
+ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim"] # 3rde generatie cefalosporine resistentie
 CULTURE_SIZE_CUTOFF = 5
 AB_CULTURE_COUNT_CUTOFF = 20
 
@@ -17,13 +17,13 @@ def main(args):
     method = args.method
 
     if args.average:
-        classifier = average.Average(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTENCE_LIST)
+        classifier = average.Average(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTANCE_LIST)
     # elif args.svm:
-    #     SVM.run(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTENCE_LIST)
+    #     SVM.run(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTANCE_LIST)
     elif args.tree:
-        classifier = decision_tree.DecisionTree(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTENCE_LIST, testmode=method)
+        classifier = decision_tree.DecisionTree(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTANCE_LIST, testmode=method)
     elif args.perceptron:
-        classifier = perceptron.Perceptron(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTENCE_LIST, testmode=method)
+        classifier = perceptron.Perceptron(filename, args.culture_cutoff, args.ab_count_cutoff, ESBL_AB_RESISTANCE_LIST, testmode=method)
     
     classifier.run()
 

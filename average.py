@@ -50,5 +50,5 @@ class Average():
         print("RESULTS OF AVERAGE METHOD:")
         for index in range(len(esbl_pos_result)):
             print("________")
-            print("Positive resistence result: Name - {}, S/SIR - {}, Susceptible Count - {}, Resistent Count - {}".format(esbl_pos_result[index][0], esbl_pos_result[index][1], esbl_pos_result[index][2], esbl_pos_result[index][3]))
-            print("Negative resistence result: Name - {}, S/SIR - {}, Susceptible Count - {}, Resistent Count - {}".format(esbl_neg_result[index][0], esbl_neg_result[index][1], esbl_neg_result[index][2], esbl_neg_result[index][3]))
+            print("Positive resistance result: Name - {}, S/SIR - {}, Susceptible Count - {}, Resistent Count - {}".format(esbl_pos_result[index][0], esbl_pos_result[index][1], esbl_pos_result[index][2], esbl_pos_result[index][3]))
+            print("Negative resistance result: Name - {}, S/SIR - {}, Susceptible Count - {}, Resistent Count - {}".format(esbl_neg_result[index][0], esbl_neg_result[index][1], esbl_neg_result[index][2], esbl_neg_result[index][3]))

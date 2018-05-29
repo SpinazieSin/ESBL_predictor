@@ -12,14 +12,14 @@ class Perceptron():
     def __init__(self, filename,
                        CULTURE_SIZE_CUTOFF=0,
                        AB_CULTURE_COUNT_CUTOFF=0,
-                       ESBL_AB_RESISTENCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
+                       ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
                        cross_validation=100,
                        testmode="cross_validation"):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
                                          AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
-                                         ESBL_AB_RESISTENCE_LIST=ESBL_AB_RESISTENCE_LIST)
+                                         ESBL_AB_RESISTANCE_LIST=ESBL_AB_RESISTANCE_LIST)
         self.cross_validation = cross_validation
         self.testmode = testmode
         self.patient_list = []
@@ -33,8 +33,9 @@ class Perceptron():
                 print(str(iteration) + " ...")
 
             # Split dataset into train and test
-            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.data,
-                                                                                                         break_amount=1.2,
+            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.pos_training_data,
+                                                                                                         self.neg_training_data,
+                                                                                                         break_amount=1,
                                                                                                          split_percentage=20)
 
             # Train percpetron on training set
@@ -60,7 +61,8 @@ class Perceptron():
                 print(str(iteration) + " ...")
 
             # Create training set (split percentage is 0)
-            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.data,
+            train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.pos_training_data,
+                                                                                                         self.neg_training_data,
                                                                                                          break_amount=1,
                                                                                                          split_percentage=0)
 
@@ -98,14 +100,22 @@ class Perceptron():
 
 
     def run(self):
-        self.data.load_culture_data(self.filename)
+        
+        if False:
+            self.data.load_culture_data(self.filename)
+            
+            print("Converting data ...")
+            self.data.load_filtered_esbl_patient_data()
+            self.pos_training_data = self.data.esbl_pos_patient_data
+            self.neg_training_data = self.data.esbl_neg_patient_data
 
-        print("Converting data ...")
-        self.data.load_filtered_esbl_patient_data()
+        else:
+            self.data.load_patient_data("data/sample2.csv", "data/sample.csv")
+            self.pos_training_data, self.neg_training_data = process_data.vectorize_culture_data(self.data.patient_dict)
 
         if self.testmode == "cross_validation":
             print("Running cross validation " + str(self.cross_validation) + " times ...")
-            
+
             pos_predictor_result, neg_predictor_result = self.run_cross_validation()
             
             print("RESULTS OF MULTILAYER PERCEPTRON:")
