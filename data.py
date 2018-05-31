@@ -17,8 +17,18 @@ class Representation():
         self.AB_CULTURE_COUNT_CUTOFF = AB_CULTURE_COUNT_CUTOFF
         self.ESBL_AB_RESISTANCE_LIST = ESBL_AB_RESISTANCE_LIST
 
-    def set_RELATIVE_AB_CULTURE_COUNT_CUTOFF(self):
+    def set_RELATIVE_AB_CULTURE_COUNT_CUTOFF(self, date_range=[5, 90]):
         self.RELATIVE_AB_CULTURE_COUNT_CUTOFF = float(len(self.esbl_pos_patient_data))*(float(self.AB_CULTURE_COUNT_CUTOFF)/100)
+        # Extract relevant antibiotics
+        temp_esbl_pos, temp = process_data.generate_esbl_patient_data(self.id_dict,
+                                                                      self.ab_dict,
+                                                                      self.CULTURE_SIZE_CUTOFF,
+                                                                      self.ESBL_AB_RESISTANCE_LIST,
+                                                                      date_range=date_range)
+        self.relevant_ab_names = process_data.relevant_ab(process_data.count_ab(temp_esbl_pos, self.ab_names),
+                                                                                self.ab_dict,
+                                                                                self.ab_names,
+                                                                                self.RELATIVE_AB_CULTURE_COUNT_CUTOFF)
 
     def load_esbl_patient_data(self):
         self.esbl_pos_patient_data, self.esbl_neg_patient_data = process_data.generate_esbl_patient_data(self.id_dict,
@@ -26,7 +36,7 @@ class Representation():
                                                                                                          self.CULTURE_SIZE_CUTOFF,
                                                                                                          self.ESBL_AB_RESISTANCE_LIST)
 
-    def load_filtered_esbl_patient_data(self, esbl_result_format=None, numeric=True):
+    def load_filtered_esbl_patient_data(self, esbl_result_format=None, numeric=True, date_range=[5, 100]):
         self.esbl_pos_patient_data, self.esbl_neg_patient_data = process_data.generate_data(self.id_dict,
                                                                                             self.ab_dict,
                                                                                             self.ab_names,
@@ -34,7 +44,9 @@ class Representation():
                                                                                             self.CULTURE_SIZE_CUTOFF,
                                                                                             self.ESBL_AB_RESISTANCE_LIST,
                                                                                             esbl_result_format=esbl_result_format,
-                                                                                            numeric=numeric)
+                                                                                            numeric=numeric,
+                                                                                            date_range=date_range)
+        self.set_RELATIVE_AB_CULTURE_COUNT_CUTOFF(date_range=date_range)
 
     def load_culture_data(self, filename):
         self.id_dict, self.ab_dict = data_reader.read_csv(filename)
@@ -50,12 +62,6 @@ class Representation():
         # Process culture data
         self.load_esbl_patient_data()
         self.set_RELATIVE_AB_CULTURE_COUNT_CUTOFF()
-
-        # Extract relevant antibiotics
-        relevant_ab_names = process_data.relevant_ab(process_data.count_ab(self.esbl_pos_patient_data, self.ab_names),
-                                                                           self.ab_dict,
-                                                                           self.ab_names,
-                                                                           self.RELATIVE_AB_CULTURE_COUNT_CUTOFF)
 
         # Read medication data
         medication_dict, temp = data_reader.read_csv(medication_filename, data_type="dot")

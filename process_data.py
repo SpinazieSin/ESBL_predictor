@@ -38,6 +38,7 @@ def filter_ab(patient_data, relevant_ab_list, ab_dict, esbl_result, numeric):
         for ab in relevant_ab_list:
             ab_result = row[ab_dict[ab]]
             if numeric:
+                # TODO: Have this either 0 or 1 depending on intialization!
                 value = 0
                 if ab_result is 'S':
                     value = 1
@@ -79,7 +80,7 @@ def find_esbl_pos_day(patient_data, ESBL_AB_RESISTANCE_LIST):
             return culture[0]
     return None
 
-def generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict, return_date=False, numeric=False):
+def generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict, return_date=False, numeric=False, date_range=[5, 90]):
     esbl_found = False
     patient_data.sort()
 
@@ -96,38 +97,35 @@ def generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict
         culture_day = culture[0]
         ab = culture[1]
         result = culture[2]
+
         if culture_day == esbl_pos_day:
             esbl_found = True
-            # Remove this break if you want to include the cultures of the day
-            # where the patient had the ESBL producing microorganism.
-            break
+            # break
 
-        if (previous_culture_day != culture_day):
+        if previous_culture_day != culture_day:
             previous_culture_day = culture_day
-        skip = False
-        if (previous_culture_day is not None and esbl_pos_day is not None):
-            total_days= abs((previous_culture_day-esbl_pos_day).days)
-            if (total_days < 2 or total_days > 360):
-                pass
-                skip = True
 
-        if not skip:
-            if result is 'S':
-                if numeric:
-                    ab_vector[ab_dict[ab]] = 1
-                else:
-                    ab_vector[ab_dict[ab]] = 'S'
+        if (previous_culture_day is not None and esbl_pos_day is not None):
+            total_days = (previous_culture_day-esbl_pos_day).days
+            if total_days < date_range[0] or total_days > date_range[1]:
+                continue
+
+        if result is 'S':
+            if numeric:
+                ab_vector[ab_dict[ab]] = 1
             else:
-                if numeric:
-                    ab_vector[ab_dict[ab]] = -1
-                else:
-                    ab_vector[ab_dict[ab]] = 'R'
+                ab_vector[ab_dict[ab]] = 'S'
+        else:
+            if numeric:
+                ab_vector[ab_dict[ab]] = -1
+            else:
+                ab_vector[ab_dict[ab]] = 'R'
     if return_date:
         return ab_vector, esbl_found, esbl_pos_day
     else:
         return ab_vector, esbl_found
 
-def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST):
+def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST, date_range=[5, 90]):
     esbl_pos_patient_data = []
     esbl_neg_patient_data = []
     ab_length = len(ab_dict.keys())
@@ -135,25 +133,25 @@ def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RE
     for patient in id_dict.keys():
 
         patient_data = id_dict[patient]
-        if len(patient_data) < CULTURE_SIZE_CUTOFF:
-            continue
 
-        ab_vector, esbl_found = generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict)
-            
-        if np.count_nonzero(ab_vector) > 0:
+        ab_vector, esbl_found = generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict, date_range=date_range)
+
+        # PREVIOUS VERSION OF CUTOFF
+        # if len(patient_data) < CULTURE_SIZE_CUTOFF:
+        #     continue
+        
+        # NEW VERSION OF CUTOFF
+        if np.count_nonzero(ab_vector) > CULTURE_SIZE_CUTOFF:
             if esbl_found:
                 esbl_pos_patient_data.append(ab_vector)
             else:
                 esbl_neg_patient_data.append(ab_vector)
 
-    print("Found:")
-    print("Positive resistance patients: " + str(len(esbl_pos_patient_data)))
-    print("Negative resistance patients: " + str(len(esbl_neg_patient_data)))
     return esbl_pos_patient_data, esbl_neg_patient_data
 
-def generate_data(patient_data, ab_data, ab_names, AB_CULTURE_COUNT_CUTOFF, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST, esbl_result_format=None, numeric=True):
+def generate_data(patient_data, ab_data, ab_names, AB_CULTURE_COUNT_CUTOFF, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST, esbl_result_format=None, numeric=True, date_range=[5, 90]):
     
-    esbl_pos_patient_data, esbl_neg_patient_data = generate_esbl_patient_data(patient_data, ab_data, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST)
+    esbl_pos_patient_data, esbl_neg_patient_data = generate_esbl_patient_data(patient_data, ab_data, CULTURE_SIZE_CUTOFF, ESBL_AB_RESISTANCE_LIST, date_range=date_range)
 
     RELATIVE_AB_CULTURE_COUNT_CUTOFF = float(len(esbl_pos_patient_data))*(float(AB_CULTURE_COUNT_CUTOFF)/100)
 
@@ -164,6 +162,10 @@ def generate_data(patient_data, ab_data, ab_names, AB_CULTURE_COUNT_CUTOFF, CULT
     esbl_pos_patient_data = filter_ab(esbl_pos_patient_data, relevant_ab_list, ab_data, esbl_result=esbl_result_format, numeric=numeric)
     esbl_neg_patient_data = filter_ab(esbl_neg_patient_data, relevant_ab_list, ab_data, esbl_result=esbl_result_format, numeric=numeric)
 
+
+    print("Found:")
+    print("Positive resistance patients: " + str(len(esbl_pos_patient_data)))
+    print("Negative resistance patients: " + str(len(esbl_neg_patient_data)))
     return esbl_pos_patient_data, esbl_neg_patient_data
 
 def generate_training_data(pos_patient_data, neg_patient_data, break_amount=1, split_percentage=20):
@@ -178,13 +180,14 @@ def generate_training_data(pos_patient_data, neg_patient_data, break_amount=1, s
                                                          sample_count=int(break_amount*len(pos_patient_data)),
                                                          split_percentage=split_percentage)
         else:
-            train_data_temp, pos_test_data = percentage_split([], [],
+            train_data_temp, pos_test_data_temp = percentage_split([], [],
                                                               pos_patient_data,
                                                               sample_count=int(break_amount*len(pos_patient_data)),
                                                               random_sampling=True, split_percentage=split_percentage)
             train_data = []
-            for row in train_data_temp:
-                print(row)
+            pos_test_data = [ list(item) for item in pos_test_data_temp ]
+            for temp_row in train_data_temp:
+                row = list(temp_row)
                 if row not in pos_test_data:
                     train_data.append(row)
             pos_test_data.sort()

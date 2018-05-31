@@ -12,6 +12,7 @@ def read_csv(filename, data_type="culture"):
 
         id_dict = {}
         ab_dict = {}
+        row_count = 0
 
         if data_type == "culture":
 
@@ -23,10 +24,13 @@ def read_csv(filename, data_type="culture"):
                     ab_dict[ab_name] = len(ab_dict)
                 result = culture[5]
                 bepaling = culture[8]
+
                 if (not id_dict.has_key(pseudoID)):
                     id_dict[pseudoID] = [[date, ab_name, result, bepaling]]
                 else:
                     id_dict[pseudoID].append([date, ab_name, result, bepaling])
+                row_count+=1
+                if row_count%50000 == 0: print("Read {} rows ...".format(row_count)) 
         
         elif data_type == "dot":
 
@@ -42,6 +46,8 @@ def read_csv(filename, data_type="culture"):
                         id_dict[pseudoID][ab_name] = [date]
                     elif (date not in id_dict[pseudoID][ab_name]):
                         id_dict[pseudoID][ab_name].append(date)
+                row_count+=1
+                if row_count%500000 == 0: print("Read {} rows ...".format(row_count)) 
 
     return id_dict, ab_dict
 

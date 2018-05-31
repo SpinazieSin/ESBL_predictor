@@ -2,6 +2,7 @@
 import numpy as np
 from datetime import datetime
 from sklearn.neural_network import MLPClassifier
+from random import randint
 
 # Modules
 import data
@@ -13,33 +14,39 @@ class Perceptron():
                        CULTURE_SIZE_CUTOFF=0,
                        AB_CULTURE_COUNT_CUTOFF=0,
                        ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
-                       cross_validation=100,
-                       testmode="cross_validation"):
+                       testmode="cross_validation",
+                       analysis_type="culture",
+                       medication_file=None,
+                       cross_validation=200):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
                                          AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
                                          ESBL_AB_RESISTANCE_LIST=ESBL_AB_RESISTANCE_LIST)
-        self.cross_validation = cross_validation
         self.testmode = testmode
-        self.patient_list = []
+        self.analysis_type = analysis_type
+        self.medication_file = medication_file
+
+        self.cross_validation = cross_validation
 
     def run_cross_validation(self):
         pos_predictor_result = []
         neg_predictor_result = []
+
+        importance = np.zeros(len(self.data.relevant_ab_names))
         for iteration in range(self.cross_validation):
 
-            if iteration%10 is 0:
+            if iteration%50 is 0:
                 print(str(iteration) + " ...")
 
             # Split dataset into train and test
             train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.pos_training_data,
                                                                                                          self.neg_training_data,
                                                                                                          break_amount=1,
-                                                                                                         split_percentage=20)
+                                                                                                         split_percentage=10)
 
             # Train percpetron on training set
-            clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(len(self.data.ab_names), 2), random_state=1)
+            clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(2, 4), random_state=0)
             clf.fit(train_data, train_labels)
 
             # Test the classification on a test and control set
@@ -57,7 +64,7 @@ class Perceptron():
 
         for iteration in range(self.cross_validation):
 
-            if iteration%10 is 0:
+            if iteration%20 is 0:
                 print(str(iteration) + " ...")
 
             # Create training set (split percentage is 0)
@@ -101,17 +108,43 @@ class Perceptron():
 
     def run(self):
         
-        if False:
+        if self.testmode == "date":
             self.data.load_culture_data(self.filename)
+
+            print("Beginning date iteration")
+            for month in range(0, 24):
+                
+                date_range=[ 1 + month*30, 800 ]
+                print("New range - {}".format(date_range))
+
+                self.data.load_filtered_esbl_patient_data(date_range=date_range)
+                self.pos_training_data = self.data.esbl_pos_patient_data
+                self.neg_training_data = self.data.esbl_neg_patient_data
+                
+                pos_predictor_result, neg_predictor_result = self.run_cross_validation()
+                
+                print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
+                print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
             
+            return
+
+        if self.analysis_type=="culture" and self.testmode != "date":
+            self.data.load_culture_data(self.filename)
+
             print("Converting data ...")
             self.data.load_filtered_esbl_patient_data()
             self.pos_training_data = self.data.esbl_pos_patient_data
             self.neg_training_data = self.data.esbl_neg_patient_data
 
-        else:
-            self.data.load_patient_data("data/sample2.csv", "data/sample.csv")
+        elif self.analysis_type=="medication" and self.testmode != "date":
+            if not medication_file:
+                print("Medication file not set")
+                return
+            self.data.load_patient_data("data/ecoli_resistentie_bepaling.csv", "data/medicatie_toediening.csv")
             self.pos_training_data, self.neg_training_data = process_data.vectorize_culture_data(self.data.patient_dict)
+        else:
+            print("Invalid analysis type")
+            return
 
         if self.testmode == "cross_validation":
             print("Running cross validation " + str(self.cross_validation) + " times ...")
@@ -125,30 +158,33 @@ class Perceptron():
             print("Standard deviation of Esbl neg: " + str(np.std(neg_predictor_result)))
         
         elif self.testmode == "test_patient":
-            # Pick a patient
-            self.patient_list = [self.data.esbl_pos_patient_data[3], self.data.esbl_neg_patient_data[2342]]
 
-            # Remove patient from training set
-            temp = []
-            for train_patient in self.data.esbl_pos_patient_data:
-                duplicate_value = False
-                for test_patient in self.patient_list:
-                    if test_patient == train_patient:
-                        duplicate_value = True
-                if not duplicate_value: temp.append(train_patient)
+            for patient in self.data.esbl_pos_patient_data:
+                print("____________________________")
+                self.patient_list = [patient, self.data.esbl_neg_patient_data[randint(0, len(self.data.esbl_neg_patient_data)-1)]]
+                
+                self.pos_training_data = self.data.esbl_pos_patient_data
+                
+                temp = []
+                for train_patient in self.pos_training_data:
+                    duplicate_value = False
+                    for test_patient in self.patient_list:
+                        if test_patient == train_patient:
+                            duplicate_value = True
+                    if not duplicate_value: temp.append(train_patient)
 
-            # If training set changed update it
-            if len(temp) < len(self.data.esbl_pos_patient_data):
-                print("Removed {} patient(s) from training data ...".format(len(self.data.esbl_pos_patient_data) - len(temp)))
-                self.data.esbl_pos_patient_data = temp
-                print("Now training on {} patients ...".format(len(self.data.esbl_pos_patient_data)))
+                if len(temp) < len(self.pos_training_data):
+                    print("Removed {} patient(s) from training data ...".format(len(self.pos_training_data) - len(temp)))
+                    self.pos_training_data = temp
+                    print("Now training on {} patients ...".format(len(self.pos_training_data)))
 
-            print("Running on test set of {} patient(s) ...".format(len(self.patient_list)))
+                print("Running on test set of {} patient(s) ...".format(len(self.patient_list)))
 
-            patient_pos_probability, patient_certainty = self.run_single_patient()
+                patient_pos_probability, patient_certainty = self.run_single_patient()
 
-            print("RESULTS OF MULTILAYER PERCEPTRON:")
-            for patient_index in range(len(patient_pos_probability)):
-                print("-Patient {}".format(patient_index))
-                print("Esbl pos probability: {}".format(patient_pos_probability[patient_index]))
-                print("with certainty: {}".format(patient_certainty[patient_index]))
+                print("RESULTS OF MULTILAYER PERCEPTRON:")
+                for patient_index in range(len(patient_pos_probability)):
+                    print("-Patient {}".format(patient_index))
+                    print("Was resistent to: {}".format([self.data.relevant_ab_names[ab_index] for ab_index in range(len(self.patient_list[patient_index])) if self.patient_list[patient_index][ab_index] < 0] ))
+                    print("Pos probability: {}".format(patient_pos_probability[patient_index]))
+                    print("with certainty: {}".format(patient_certainty[patient_index]))
