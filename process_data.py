@@ -89,8 +89,15 @@ def generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict
     else:
         ab_vector = [None for x in range(ab_length)]
 
+    if len(patient_data) < 1: return
+
     esbl_pos_day = find_esbl_pos_day(patient_data, ESBL_AB_RESISTANCE_LIST)
-    previous_culture_day = None
+    if esbl_pos_day:
+        # The day the esbl is found is the cutoff day
+        cutoff_day = esbl_pos_day
+    else:
+        # Last day day is the cutoff day
+        cutoff_day = patient_data[len(patient_data)-1][0] 
 
     for culture in patient_data:
 
@@ -100,14 +107,13 @@ def generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict
 
         if culture_day == esbl_pos_day:
             esbl_found = True
-            # break
 
-        if previous_culture_day != culture_day:
-            previous_culture_day = culture_day
+        total_days = (cutoff_day-culture_day).days
+        if total_days > date_range[1]:
+            continue
 
-        if (previous_culture_day is not None and esbl_pos_day is not None):
-            total_days = (previous_culture_day-esbl_pos_day).days
-            if total_days < date_range[0] or total_days > date_range[1]:
+        if esbl_pos_day is not None:
+            if total_days < date_range[0]:
                 continue
 
         if result is 'S':

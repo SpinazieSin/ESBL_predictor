@@ -1,5 +1,6 @@
 # Libraries
 import numpy as np
+import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.neural_network import MLPClassifier
 from random import randint
@@ -17,7 +18,7 @@ class Perceptron():
                        testmode="cross_validation",
                        analysis_type="culture",
                        medication_file=None,
-                       cross_validation=200):
+                       cross_validation=1000):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
@@ -28,6 +29,7 @@ class Perceptron():
         self.medication_file = medication_file
 
         self.cross_validation = cross_validation
+        self.layers = [8, 2]
 
     def run_cross_validation(self):
         pos_predictor_result = []
@@ -46,7 +48,7 @@ class Perceptron():
                                                                                                          split_percentage=10)
 
             # Train percpetron on training set
-            clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(2, 4), random_state=0)
+            clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(self.layers[0], self.layers[1]), random_state=0)
             clf.fit(train_data, train_labels)
 
             # Test the classification on a test and control set
@@ -111,21 +113,48 @@ class Perceptron():
         if self.testmode == "date":
             self.data.load_culture_data(self.filename)
 
+            max_date = 15
+            results = [[0 for _ in range(max_date)] for _ in range(max_date)]
             print("Beginning date iteration")
-            for month in range(0, 24):
+            for min_month in range(0, max_date):
                 
-                date_range=[ 1 + month*30, 800 ]
-                print("New range - {}".format(date_range))
+                for max_month in range(0, max_date):
+                    if max_month < min_month: continue
 
-                self.data.load_filtered_esbl_patient_data(date_range=date_range)
-                self.pos_training_data = self.data.esbl_pos_patient_data
-                self.neg_training_data = self.data.esbl_neg_patient_data
-                
-                pos_predictor_result, neg_predictor_result = self.run_cross_validation()
-                
-                print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
-                print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
-            
+                    date_range = [ 2 + min_month*30 , 3 + max_month*30 ]
+                    print("New range - {}".format(date_range))
+
+                    self.data.load_filtered_esbl_patient_data(date_range=date_range)
+                    self.pos_training_data = self.data.esbl_pos_patient_data
+                    if len(self.pos_training_data) < 4: continue
+                    self.neg_training_data = self.data.esbl_neg_patient_data
+                    
+                    pos_predictor_result, neg_predictor_result = self.run_cross_validation()
+
+                    print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
+                    print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
+
+                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*(len(self.pos_training_data)/20.0))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+
+            print("----")
+            print(results)
+            results/=np.max(results)
+            print(results)
+            fig = plt.figure(figsize=(6, 3.2))
+
+            ax = fig.add_subplot(111)
+
+            ax.set_title('colorMap')
+            plt.imshow(results)
+            ax.set_aspect('equal')
+
+            cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
+            cax.get_xaxis().set_visible(False)
+            cax.get_yaxis().set_visible(False)
+            cax.patch.set_alpha(0)
+            cax.set_frame_on(False)
+            plt.colorbar(orientation='vertical')
+            plt.show()
             return
 
         if self.analysis_type=="culture" and self.testmode != "date":
@@ -188,3 +217,45 @@ class Perceptron():
                     print("Was resistent to: {}".format([self.data.relevant_ab_names[ab_index] for ab_index in range(len(self.patient_list[patient_index])) if self.patient_list[patient_index][ab_index] < 0] ))
                     print("Pos probability: {}".format(patient_pos_probability[patient_index]))
                     print("with certainty: {}".format(patient_certainty[patient_index]))
+
+
+        elif self.testmode == "perceptron_optimization":
+            self.data.load_culture_data(self.filename)
+
+            max_layer = 10
+            results = [[0 for _ in range(max_layer-1)] for _ in range(max_layer-1)]
+
+            print("Beginning date iteration")
+            for layer_1 in range(1, max_layer):
+                
+                for layer_2 in range(1, max_layer):
+
+                    self.layers = [ 2*layer_1, 2*layer_2 ]
+
+                    print("New layers - {}".format(self.layers))
+                    
+                    pos_predictor_result, neg_predictor_result = self.run_cross_validation()
+                    
+                    print("Average accuracy of pos: " + str(np.average(pos_predictor_result)))
+                    print("Average accuracy of neg: " + str(np.average(neg_predictor_result)))
+
+                    results[layer_1-1][layer_2-1] = (np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result))
+                    
+            results/=np.max(results)
+
+            fig = plt.figure(figsize=(6, 3.2))
+
+            ax = fig.add_subplot(111)
+
+            ax.set_title('colorMap')
+            plt.imshow(results)
+            ax.set_aspect('equal')
+
+            cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
+            cax.get_xaxis().set_visible(False)
+            cax.get_yaxis().set_visible(False)
+            cax.patch.set_alpha(0)
+            cax.set_frame_on(False)
+            plt.colorbar(orientation='vertical')
+            plt.show()
+            return

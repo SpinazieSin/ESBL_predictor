@@ -36,7 +36,7 @@ class Representation():
                                                                                                          self.CULTURE_SIZE_CUTOFF,
                                                                                                          self.ESBL_AB_RESISTANCE_LIST)
 
-    def load_filtered_esbl_patient_data(self, esbl_result_format=None, numeric=True, date_range=[5, 100]):
+    def load_filtered_esbl_patient_data(self, esbl_result_format=None, numeric=True, date_range=[2, 2+(7*30)]):
         self.esbl_pos_patient_data, self.esbl_neg_patient_data = process_data.generate_data(self.id_dict,
                                                                                             self.ab_dict,
                                                                                             self.ab_names,

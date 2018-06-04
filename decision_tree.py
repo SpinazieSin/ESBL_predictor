@@ -18,7 +18,7 @@ class DecisionTree():
                        testmode="cross_validation",
                        analysis_type="culture",
                        medication_file=None,
-                       cross_validation=2000):
+                       cross_validation=3000):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
@@ -110,7 +110,7 @@ class DecisionTree():
         if self.testmode == "date":
             self.data.load_culture_data(self.filename)
 
-            max_date = 5
+            max_date = 15
             pos_results = [[0 for _ in range(max_date)] for _ in range(max_date)]
             neg_results = [[0 for _ in range(max_date)] for _ in range(max_date)]
             print("Beginning date iteration")
@@ -119,12 +119,12 @@ class DecisionTree():
                 for max_month in range(0, max_date):
                     if max_month < min_month: continue
 
-                    date_range=[ 1 + min_month*30 , 1 + max_month*30 ]
+                    date_range = [ 2 + min_month*30 , 3 + max_month*30 ]
                     print("New range - {}".format(date_range))
 
                     self.data.load_filtered_esbl_patient_data(date_range=date_range)
                     self.pos_training_data = self.data.esbl_pos_patient_data
-                    if len(self.pos_training_data) < 2: continue
+                    if len(self.pos_training_data) < 4: continue
                     self.neg_training_data = self.data.esbl_neg_patient_data
                     
                     pos_predictor_result, neg_predictor_result = self.run_cross_validation()
@@ -132,10 +132,10 @@ class DecisionTree():
                     print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
                     print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
 
-                    pos_results[min_month][max_month] = np.average(pos_predictor_result)
-                    neg_results[min_month][max_month] = np.average(neg_predictor_result)
-            
-            print(pos_results)
+                    pos_results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*len(self.pos_training_data))/(np.std(pos_predictor_result)*np.std(neg_predictor_result))
+                    
+            pos_results/=np.max(pos_results)
+
             fig = plt.figure(figsize=(6, 3.2))
 
             ax = fig.add_subplot(111)
@@ -152,7 +152,6 @@ class DecisionTree():
             plt.colorbar(orientation='vertical')
             plt.show()
             return
-
         if self.analysis_type=="culture":
             self.data.load_culture_data(self.filename)
             
