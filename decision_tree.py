@@ -111,10 +111,9 @@ class DecisionTree():
             self.data.load_culture_data(self.filename)
 
             max_date = 15
-            pos_results = [[0 for _ in range(max_date)] for _ in range(max_date)]
-            neg_results = [[0 for _ in range(max_date)] for _ in range(max_date)]
+            results = [[0 for _ in range(max_date)] for _ in range(max_date)]
             print("Beginning date iteration")
-            for min_month in range(0, max_date):
+            for min_month in range(0, 6):
                 
                 for max_month in range(0, max_date):
                     if max_month < min_month: continue
@@ -124,24 +123,23 @@ class DecisionTree():
 
                     self.data.load_filtered_esbl_patient_data(date_range=date_range)
                     self.pos_training_data = self.data.esbl_pos_patient_data
-                    if len(self.pos_training_data) < 4: continue
+                    if len(self.pos_training_data) < 8: continue
                     self.neg_training_data = self.data.esbl_neg_patient_data
                     
                     pos_predictor_result, neg_predictor_result = self.run_cross_validation()
-                    
+
                     print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
                     print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
 
-                    pos_results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*len(self.pos_training_data))/(np.std(pos_predictor_result)*np.std(neg_predictor_result))
-                    
-            pos_results/=np.max(pos_results)
+                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*(len(self.pos_training_data)/20.0))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
 
+            results/=np.max(results)
             fig = plt.figure(figsize=(6, 3.2))
 
             ax = fig.add_subplot(111)
 
             ax.set_title('colorMap')
-            plt.imshow(pos_results)
+            plt.imshow(results)
             ax.set_aspect('equal')
 
             cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
@@ -152,6 +150,7 @@ class DecisionTree():
             plt.colorbar(orientation='vertical')
             plt.show()
             return
+
         if self.analysis_type=="culture":
             self.data.load_culture_data(self.filename)
             

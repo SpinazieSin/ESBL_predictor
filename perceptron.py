@@ -76,7 +76,7 @@ class Perceptron():
                                                                                                          split_percentage=0)
 
             # Train a perceptron classifier
-            clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(15, 5), random_state=1)
+            clf = MLPClassifier(solver='lbfgs', alpha=1e-3, hidden_layer_sizes=(self.layers[0], self.layers[1]), random_state=0)
             clf.fit(train_data, train_labels)
 
             # Output prediction probabilities
@@ -116,7 +116,7 @@ class Perceptron():
             max_date = 15
             results = [[0 for _ in range(max_date)] for _ in range(max_date)]
             print("Beginning date iteration")
-            for min_month in range(0, max_date):
+            for min_month in range(0, 6):
                 
                 for max_month in range(0, max_date):
                     if max_month < min_month: continue
@@ -126,7 +126,7 @@ class Perceptron():
 
                     self.data.load_filtered_esbl_patient_data(date_range=date_range)
                     self.pos_training_data = self.data.esbl_pos_patient_data
-                    if len(self.pos_training_data) < 4: continue
+                    if len(self.pos_training_data) < 8: continue
                     self.neg_training_data = self.data.esbl_neg_patient_data
                     
                     pos_predictor_result, neg_predictor_result = self.run_cross_validation()
@@ -134,12 +134,9 @@ class Perceptron():
                     print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
                     print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
 
-                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*(len(self.pos_training_data)/20.0))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*(len(pos_predictor_result)/20.0))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
 
-            print("----")
-            print(results)
             results/=np.max(results)
-            print(results)
             fig = plt.figure(figsize=(6, 3.2))
 
             ax = fig.add_subplot(111)
