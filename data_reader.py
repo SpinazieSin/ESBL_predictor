@@ -3,7 +3,7 @@ import csv
 import io
 from datetime import datetime
 
-def read_csv(filename, data_type="culture"):
+def read_csv(filename, RELEVANT_MO_LIST=[], data_type="culture"):
     print("Reading " + filename + " ...")
 
     with open(filename, 'r') as csvfile:
@@ -17,6 +17,8 @@ def read_csv(filename, data_type="culture"):
         if data_type == "culture":
 
             for culture in csv_data:
+                if RELEVANT_MO_LIST and culture[7] not in RELEVANT_MO_LIST: continue
+
                 pseudoID = culture[0]
                 date = datetime.strptime(culture[1], "%d-%m-%Y").date()
                 ab_name = culture[2].lower()

@@ -15,15 +15,17 @@ class DecisionTree():
                        CULTURE_SIZE_CUTOFF=0,
                        AB_CULTURE_COUNT_CUTOFF=0,
                        ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
+                       RELEVANT_MO_LIST=[],
                        testmode="cross_validation",
                        analysis_type="culture",
                        medication_file=None,
-                       cross_validation=3000):
+                       cross_validation=8000):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
                                          AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
-                                         ESBL_AB_RESISTANCE_LIST=ESBL_AB_RESISTANCE_LIST)
+                                         ESBL_AB_RESISTANCE_LIST=ESBL_AB_RESISTANCE_LIST,
+                                         RELEVANT_MO_LIST=RELEVANT_MO_LIST,)
         self.testmode = testmode
         self.analysis_type=analysis_type
         self.cross_validation = cross_validation
@@ -58,9 +60,11 @@ class DecisionTree():
         for i in range(len(self.data.relevant_ab_names)):
             results.append([importance[i]/self.cross_validation, self.data.relevant_ab_names[i]])
         results.sort(reverse=True)
+
         for i in range(len(self.data.relevant_ab_names)):
             print("{}: {}".format(results[i][1], results[i][0]))
         print("")
+
         return pos_predictor_result, neg_predictor_result
 
     def run_single_patient(self):
@@ -110,20 +114,23 @@ class DecisionTree():
         if self.testmode == "date":
             self.data.load_culture_data(self.filename)
 
-            max_date = 15
-            results = [[0 for _ in range(max_date)] for _ in range(max_date)]
+            max_date = 20
+            min_date = 3
+            results = [[0 for _ in range(max_date)] for _ in range(min_date)]
+
             print("Beginning date iteration")
-            for min_month in range(0, 6):
+            for min_month in range(0, min_date):
                 
                 for max_month in range(0, max_date):
                     if max_month < min_month: continue
 
-                    date_range = [ 2 + min_month*30 , 3 + max_month*30 ]
-                    print("New range - {}".format(date_range))
+                    self.data.date_range = [ 2 + min_month*30 , 3 + max_month*30 ]
+                    print("New range - {}".format(self.data.date_range))
 
-                    self.data.load_filtered_esbl_patient_data(date_range=date_range)
+                    self.data.load_filtered_esbl_patient_data()
+
                     self.pos_training_data = self.data.esbl_pos_patient_data
-                    if len(self.pos_training_data) < 8: continue
+                    if len(self.pos_training_data) < 10: continue
                     self.neg_training_data = self.data.esbl_neg_patient_data
                     
                     pos_predictor_result, neg_predictor_result = self.run_cross_validation()
@@ -131,10 +138,20 @@ class DecisionTree():
                     print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
                     print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
 
-                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*(len(self.pos_training_data)/20.0))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+                    # results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*len(self.pos_training_data))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
 
-            results/=np.max(results)
-            fig = plt.figure(figsize=(6, 3.2))
+
+            best_score = np.max(results)
+            for layer_1 in range(len(results)):
+                for layer_2 in range(len(results[layer_1])):
+                    if results[layer_1][layer_2] == best_score:
+                        print("\n")
+                        print("Best date: {},{}".format((layer_1+1)*2, layer_2))
+                        print("With Score: {}".format(results[layer_1][layer_2]))
+
+            results/=np.max(best_score)
+            fig = plt.figure(figsize=(8, 4))
 
             ax = fig.add_subplot(111)
 
@@ -147,7 +164,6 @@ class DecisionTree():
             cax.get_yaxis().set_visible(False)
             cax.patch.set_alpha(0)
             cax.set_frame_on(False)
-            plt.colorbar(orientation='vertical')
             plt.show()
             return
 
@@ -158,14 +174,17 @@ class DecisionTree():
             self.data.load_filtered_esbl_patient_data()
             self.pos_training_data = self.data.esbl_pos_patient_data
             self.neg_training_data = self.data.esbl_neg_patient_data
-
-        else:
-            if not medication_file:
+        
+        elif self.analysis_type=="medication" and self.testmode != "date":
+            if not self.medication_file:
                 print("Medication file not set")
                 return
-            self.data.load_patient_data("data/ecoli_resistentie_bepaling.csv", "data/medicatie_toediening.csv")
-            self.pos_training_data, self.neg_training_data = process_data.vectorize_medication_data(self.data.patient_dict)
-
+            self.data.load_patient_data(self.filename, self.medication_file)
+            self.pos_training_data, self.neg_training_data = process_data.vectorize_culture_data(self.data.patient_dict)
+        else:
+            print("Invalid analysis type")
+            return
+        
         if self.testmode == "cross_validation":
             print("Running cross validation " + str(self.cross_validation) + " times ...")
 
@@ -182,25 +201,27 @@ class DecisionTree():
             for patient in self.data.esbl_pos_patient_data:
                 print("____________________________")
                 self.patient_list = [patient, self.data.esbl_neg_patient_data[randint(0, len(self.data.esbl_neg_patient_data)-1)]]
-
+                
+                self.pos_training_data = self.data.esbl_pos_patient_data
+                
                 temp = []
-                for train_patient in self.data.esbl_pos_patient_data:
+                for train_patient in self.pos_training_data:
                     duplicate_value = False
                     for test_patient in self.patient_list:
                         if test_patient == train_patient:
                             duplicate_value = True
                     if not duplicate_value: temp.append(train_patient)
 
-                if len(temp) < len(self.data.esbl_pos_patient_data):
-                    print("Removed {} patient(s) from training data ...".format(len(self.data.esbl_pos_patient_data) - len(temp)))
-                    self.data.esbl_pos_patient_data = temp
-                    print("Now training on {} patients ...".format(len(self.data.esbl_pos_patient_data)))
+                if len(temp) < len(self.pos_training_data):
+                    print("Removed {} patient(s) from training data ...".format(len(self.pos_training_data) - len(temp)))
+                    self.pos_training_data = temp
+                    print("Now training on {} patients ...".format(len(self.pos_training_data)))
 
                 print("Running on test set of {} patient(s) ...".format(len(self.patient_list)))
 
                 patient_pos_probability, patient_certainty = self.run_single_patient()
 
-                print("RESULTS OF DECISION TREE:")
+                print("RESULTS OF MULTILAYER PERCEPTRON:")
                 for patient_index in range(len(patient_pos_probability)):
                     print("-Patient {}".format(patient_index))
                     print("Was resistent to: {}".format([self.data.relevant_ab_names[ab_index] for ab_index in range(len(self.patient_list[patient_index])) if self.patient_list[patient_index][ab_index] < 0] ))

@@ -8,6 +8,9 @@ from math import floor
 import data
 import patient_data
 
+# Important modifications can be found by looking for the SETTING: tag.
+# These can be changed by the user to influence the analysis but it is not needed.
+
 def count_ab(esbl_patient_data, ab_names):
     ab_count = np.zeros((len(ab_names), 2))
     for ab_vector in esbl_patient_data:
@@ -38,7 +41,7 @@ def filter_ab(patient_data, relevant_ab_list, ab_dict, esbl_result, numeric):
         for ab in relevant_ab_list:
             ab_result = row[ab_dict[ab]]
             if numeric:
-                # TODO: Have this either 0 or 1 depending on intialization!
+                # SETTING: value is the default value of an ab in the ab_vector.
                 value = 0
                 if ab_result is 'S':
                     value = 1
@@ -57,6 +60,7 @@ def percentage_split(train_data, test_data, esbl_patient_data, split_percentage,
     if sample_count > 0 and random_sampling:
         data_length = len(esbl_patient_data)-1
         for i in range(sample_count):
+            # SETTING: Random probability can be changed to be more/less accurate
             if randint(0, 100) < split_percentage:
                 test_data.append(esbl_patient_data[randint(0, data_length)])
             else:
@@ -76,19 +80,25 @@ def find_esbl_pos_day(patient_data, ESBL_AB_RESISTANCE_LIST):
         ab = culture[1]
         result = culture[2]
         bepaling = culture[3]
+        # SETTING: Culture type can be changed from blood culture (M_banaal_BK) to other types.
+        # This only affects the check if a patient is infected with a resistant virus.
         if (ab in ESBL_AB_RESISTANCE_LIST and result is not 'S' and "M_banaal_BK" in bepaling):
             return culture[0]
     return None
 
 def generate_ab_vector(patient_data, ab_length, ESBL_AB_RESISTANCE_LIST, ab_dict, return_date=False, numeric=False, date_range=[5, 90]):
     esbl_found = False
-    patient_data.sort()
+    # SETTING: Non-reversed makes the analyzer take the most recent culture for analysis (which is generally prefered). Reversing
+    # it makes it take the oldest culture.
+    patient_data.sort(reverse=False)
 
     if numeric:
         ab_vector = np.zeros(ab_length)
     else:
         ab_vector = [None for x in range(ab_length)]
 
+    # SETTING: Patients with little data can be skipped by increasing the required length of the patient data.
+    # This is done later as well with CULTURE_SIZE_CUTOFF, but the minimum length is more basic and saves processing time. 
     if len(patient_data) < 1: return
 
     esbl_pos_day = find_esbl_pos_day(patient_data, ESBL_AB_RESISTANCE_LIST)
@@ -148,6 +158,11 @@ def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RE
         
         # NEW VERSION OF CUTOFF
         if np.count_nonzero(ab_vector) > CULTURE_SIZE_CUTOFF:
+            # SETTING: r_length sets the minimum amount of ab resistence needed for a patient to be added.
+            r_length = len([1 for x in ab_vector if x == 'R'])
+            if r_length < 3:
+                # continue
+                pass
             if esbl_found:
                 esbl_pos_patient_data.append(ab_vector)
             else:
@@ -180,6 +195,7 @@ def generate_training_data(pos_patient_data, neg_patient_data, break_amount=1, s
         pos_test_data = []
         neg_test_data = []
 
+        # HACK: Do not mess with this unless it is carefully considered.
         if break_amount == 1:
             train_data, pos_test_data = percentage_split([], [],
                                                          pos_patient_data,
@@ -191,11 +207,17 @@ def generate_training_data(pos_patient_data, neg_patient_data, break_amount=1, s
                                                               sample_count=int(break_amount*len(pos_patient_data)),
                                                               random_sampling=True, split_percentage=split_percentage)
             train_data = []
+            row_removed = [] # HACK: Added so no extra data is removed.
             pos_test_data = [ list(item) for item in pos_test_data_temp ]
+            # TODO: Make rows indexed so we don't need to find them again and use the row_removed hack.
             for temp_row in train_data_temp:
                 row = list(temp_row)
-                if row not in pos_test_data:
+                # If train data is in test data, don't use it.
+                if row not in pos_test_data or row in row_removed:
                     train_data.append(row)
+                # In case of duplicate data.
+                else:
+                    row_removed.append(row)
             pos_test_data.sort()
             pos_test_data = list(k for k,_ in it.groupby(pos_test_data))
 

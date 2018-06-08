@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from sklearn.neural_network import MLPClassifier
 from random import randint
+from time import time
 
 # Modules
 import data
@@ -15,15 +16,17 @@ class Perceptron():
                        CULTURE_SIZE_CUTOFF=0,
                        AB_CULTURE_COUNT_CUTOFF=0,
                        ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"],
+                       RELEVANT_MO_LIST=[],
                        testmode="cross_validation",
                        analysis_type="culture",
                        medication_file=None,
-                       cross_validation=1000):
+                       cross_validation=5000):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
                                          AB_CULTURE_COUNT_CUTOFF=AB_CULTURE_COUNT_CUTOFF,
-                                         ESBL_AB_RESISTANCE_LIST=ESBL_AB_RESISTANCE_LIST)
+                                         ESBL_AB_RESISTANCE_LIST=ESBL_AB_RESISTANCE_LIST,
+                                         RELEVANT_MO_LIST=RELEVANT_MO_LIST,)
         self.testmode = testmode
         self.analysis_type = analysis_type
         self.medication_file = medication_file
@@ -31,15 +34,23 @@ class Perceptron():
         self.cross_validation = cross_validation
         self.layers = [8, 2]
 
+        self.iteration_timer_estimate = 0
+
     def run_cross_validation(self):
         pos_predictor_result = []
         neg_predictor_result = []
 
+        self.iteration_timer_estimate = 0
         importance = np.zeros(len(self.data.relevant_ab_names))
+        
         for iteration in range(self.cross_validation):
+
+            # Start of timer
+            iteration_start = time()
 
             if iteration%50 is 0:
                 print(str(iteration) + " ...")
+                print("Time left: {}".format((self.iteration_timer_estimate/(iteration+1))*(self.cross_validation-iteration)))
 
             # Split dataset into train and test
             train_data, pos_test_data, neg_test_data, train_labels = process_data.generate_training_data(self.pos_training_data,
@@ -58,6 +69,8 @@ class Perceptron():
             # Calculate accuracy and store it
             pos_predictor_result.append(len([1 for x in pos_pred_test if x == "POS"])/float(len(pos_pred_test)))
             neg_predictor_result.append(len([1 for x in neg_pred_test if x == "NEG"])/float(len(neg_pred_test)))
+
+            self.iteration_timer_estimate+=(time()-iteration_start)
 
         return pos_predictor_result, neg_predictor_result
 
@@ -115,18 +128,20 @@ class Perceptron():
 
             max_date = 15
             results = [[0 for _ in range(max_date)] for _ in range(max_date)]
+
             print("Beginning date iteration")
-            for min_month in range(0, 6):
+            for min_month in range(0, 2):
                 
                 for max_month in range(0, max_date):
                     if max_month < min_month: continue
 
-                    date_range = [ 2 + min_month*30 , 3 + max_month*30 ]
-                    print("New range - {}".format(date_range))
+                    self.data.date_range = [ 2 + min_month*30 , 3 + max_month*30 ]
+                    print("New range - {}".format(self.data.date_range))
 
-                    self.data.load_filtered_esbl_patient_data(date_range=date_range)
+                    self.data.load_filtered_esbl_patient_data()
+
                     self.pos_training_data = self.data.esbl_pos_patient_data
-                    if len(self.pos_training_data) < 8: continue
+                    if len(self.pos_training_data) < 16: continue
                     self.neg_training_data = self.data.esbl_neg_patient_data
                     
                     pos_predictor_result, neg_predictor_result = self.run_cross_validation()
@@ -134,9 +149,19 @@ class Perceptron():
                     print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
                     print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
 
-                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*(len(pos_predictor_result)/20.0))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+                    # results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*len(self.pos_training_data))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
 
-            results/=np.max(results)
+
+            best_score = np.max(results)
+            for layer_1 in range(len(results)):
+                for layer_2 in range(len(results[layer_1])):
+                    if results[layer_1][layer_2] == best_score:
+                        print("\n")
+                        print("Best date: {},{}".format((layer_1+1)*2, layer_2))
+                        print("With Score: {}".format(results[layer_1][layer_2]))
+
+            results/=np.max(best_score)
             fig = plt.figure(figsize=(6, 3.2))
 
             ax = fig.add_subplot(111)
@@ -163,10 +188,10 @@ class Perceptron():
             self.neg_training_data = self.data.esbl_neg_patient_data
 
         elif self.analysis_type=="medication" and self.testmode != "date":
-            if not medication_file:
+            if not self.medication_file:
                 print("Medication file not set")
                 return
-            self.data.load_patient_data("data/ecoli_resistentie_bepaling.csv", "data/medicatie_toediening.csv")
+            self.data.load_patient_data(self.filename, self.medication_file)
             self.pos_training_data, self.neg_training_data = process_data.vectorize_culture_data(self.data.patient_dict)
         else:
             print("Invalid analysis type")
@@ -217,9 +242,7 @@ class Perceptron():
 
 
         elif self.testmode == "perceptron_optimization":
-            self.data.load_culture_data(self.filename)
-
-            max_layer = 10
+            max_layer = 15
             results = [[0 for _ in range(max_layer-1)] for _ in range(max_layer-1)]
 
             print("Beginning date iteration")
@@ -230,14 +253,19 @@ class Perceptron():
                     self.layers = [ 2*layer_1, 2*layer_2 ]
 
                     print("New layers - {}".format(self.layers))
-                    
+
                     pos_predictor_result, neg_predictor_result = self.run_cross_validation()
-                    
+                    print(pos_predictor_result)
+                    print(neg_predictor_result)
                     print("Average accuracy of pos: " + str(np.average(pos_predictor_result)))
                     print("Average accuracy of neg: " + str(np.average(neg_predictor_result)))
 
-                    results[layer_1-1][layer_2-1] = (np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result))
-                    
+                    results[layer_1-1][layer_2-1] = (np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+            
+            for layer_1 in range(len(results)):
+                for layer_2 in range(len(results[layer_1])):
+                    if results[layer_1][layer_2] == np.max(results):
+                        print("Best layers: {},{}".format((layer_1+1)*2, layer_2))
             results/=np.max(results)
 
             fig = plt.figure(figsize=(6, 3.2))
