@@ -8,7 +8,7 @@ import decision_tree
 import perceptron
 
 # Defined constants
-ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon"] # 3rde generatie cefalosporine resistentie
+ESBL_AB_RESISTANCE_LIST = ["cefotaxim", "ceftazidim", "ceftriaxon", "cefepime"] # 3rde generatie cefalosporine resistentie
 # RELEVANT_MO_LIST = ["Escherichia coli"]
 RELEVANT_MO_LIST = []
 CULTURE_SIZE_CUTOFF = 10

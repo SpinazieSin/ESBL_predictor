@@ -160,10 +160,10 @@ def generate_esbl_patient_data(id_dict, ab_dict, CULTURE_SIZE_CUTOFF, ESBL_AB_RE
         if np.count_nonzero(ab_vector) > CULTURE_SIZE_CUTOFF:
             # SETTING: r_length sets the minimum amount of ab resistence needed for a patient to be added.
             r_length = len([1 for x in ab_vector if x == 'R'])
-            if r_length < 3:
-                # continue
-                pass
             if esbl_found:
+                if r_length < 3:
+                    # continue
+                    pass
                 esbl_pos_patient_data.append(ab_vector)
             else:
                 esbl_neg_patient_data.append(ab_vector)
@@ -178,7 +178,13 @@ def generate_data(patient_data, ab_data, ab_names, AB_CULTURE_COUNT_CUTOFF, CULT
 
     esbl_pos_ab_count = count_ab(esbl_pos_patient_data, ab_names)
     esbl_neg_ab_count = count_ab(esbl_neg_patient_data, ab_names)
+
+    # Base relevant ab on RELATIVE_AB_CULTURE_COUNT_CUTOFF.
     relevant_ab_list = relevant_ab(esbl_pos_ab_count, ab_data, ab_names, RELATIVE_AB_CULTURE_COUNT_CUTOFF)
+    # Manually add relevant ab.
+    # relevant_ab_list = ["cefotaxim", "ceftazidim", "cefepime"]
+    # relevant_ab_list = ["tazocin", "ciprofloxacine", "amoxicilline", "fosfomycine", "augmentin", "trimethoprim"]
+    relevant_ab_list = ["augmentin", "cotrimoxazol", "ciprofloxacine", "trimethoprim", "tazocin", "cefotaxim", "ceftazidim", "cefuroxim", "cefepime", "amoxicilline"]
 
     esbl_pos_patient_data = filter_ab(esbl_pos_patient_data, relevant_ab_list, ab_data, esbl_result=esbl_result_format, numeric=numeric)
     esbl_neg_patient_data = filter_ab(esbl_neg_patient_data, relevant_ab_list, ab_data, esbl_result=esbl_result_format, numeric=numeric)
@@ -242,13 +248,20 @@ def generate_training_data(pos_patient_data, neg_patient_data, break_amount=1, s
 
     return train_data, pos_test_data, neg_test_data, train_labels
 
-def count_dot(dates, limit=False):
-    if not limit:
-        return len(dates)
-    
+def count_dot(dates, limit=False, date_range=[2, 3+(6*30)]):
+
+    dates.sort(reverse=True)
+
+    if limit:
+        init_date = limit
+    else:
+        init_date = dates[0]
+
     dot = 0
     for date in dates:
-        if date < limit:
+        if date > init_date: continue
+        day_diff = (init_date-date).days
+        if day_diff > date_range[0] and day_diff < date_range[1]:
             dot+=1
 
     return dot

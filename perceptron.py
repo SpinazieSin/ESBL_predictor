@@ -20,7 +20,7 @@ class Perceptron():
                        testmode="cross_validation",
                        analysis_type="culture",
                        medication_file=None,
-                       cross_validation=5000):
+                       cross_validation=3000):
         self.filename = filename
         self.data = data.Representation()
         self.data.set_culture_parameters(CULTURE_SIZE_CUTOFF=CULTURE_SIZE_CUTOFF,
@@ -41,6 +41,7 @@ class Perceptron():
         neg_predictor_result = []
 
         self.iteration_timer_estimate = 0
+
         importance = np.zeros(len(self.data.relevant_ab_names))
         
         for iteration in range(self.cross_validation):
@@ -123,14 +124,133 @@ class Perceptron():
 
     def run(self):
         
-        if self.testmode == "date":
-            self.data.load_culture_data(self.filename)
-
+        if self.testmode == "date" and self.analysis_type == "medication":
+            if not self.medication_file:
+                print("Medication file not set")
+                return
+            self.data.load_patient_data(self.filename, self.medication_file)
+ 
             max_date = 15
-            results = [[0 for _ in range(max_date)] for _ in range(max_date)]
+            min_date = 1
+            results = [[0 for _ in range(max_date)] for _ in range(min_date)]
+            score = []
+            sensitivity = []
+            specificity = []
+            sensitivity_variance = []
+            specificity_variance = []
+            x_axis = []
 
             print("Beginning date iteration")
-            for min_month in range(0, 2):
+            for min_month in range(0, min_date):
+                
+                for max_month in range(0, max_date):
+                    if max_month < min_month: continue
+
+                    self.data.date_range = [ 1 + min_month*30 , 2 + max_month*30 ]
+                    print("New range - {}".format(self.data.date_range))
+                    self.data.generate_patient_data()
+                    self.pos_training_data, self.neg_training_data = process_data.vectorize_medication_data(self.data.patient_dict)
+
+                    pos_predictor_result, neg_predictor_result = self.run_cross_validation()
+
+                    print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
+                    print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
+
+                    # results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*len(self.pos_training_data))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+                    results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
+                    
+                    # Graph results
+                    score.append((np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1))
+                    sensitivity.append(np.mean(pos_predictor_result))
+                    specificity.append(np.mean(neg_predictor_result))
+                    sensitivity_variance.append(np.std(pos_predictor_result))
+                    specificity_variance.append(np.std(neg_predictor_result))
+                    x_axis.append(max_month)
+
+            use_graph = True
+            use_grid = False
+            if use_graph:
+                print(score)
+                def sliding_mean(data_array, window=5):  
+                    data_array = array(data_array)  
+                    new_list = []  
+                    for i in range(len(data_array)):  
+                        indices = range(max(i - window + 1, 0),  
+                                        min(i + window + 1, len(data_array)))  
+                        avg = 0  
+                        for j in indices:  
+                            avg += data_array[j]  
+                        avg /= float(len(indices))  
+                        new_list.append(avg)  
+                          
+                    return array(new_list)  
+ 
+                plt.figure(figsize=(12, 9))  
+                  
+                ax = plt.subplot(111)  
+                ax.spines["top"].set_visible(False)  
+                ax.spines["right"].set_visible(False)  
+                  
+                ax.get_xaxis().tick_bottom()  
+                ax.get_yaxis().tick_left()  
+
+                plt.ylim(0, 1)  
+
+                plt.xticks(fontsize=14)  
+                plt.yticks(fontsize=14)  
+
+                plt.ylabel("Score", fontsize=16)  
+                  
+
+                plt.plot(x_axis, sensitivity, color="blue", lw=2)
+                plt.plot(x_axis, specificity, color="green", lw=2)
+                plt.plot(x_axis, score, color="red", lw=2)
+                plt.title("", fontsize=22)  
+                plt.xlabel("\nAge of medication", fontsize=10)  
+                  
+                plt.show() 
+
+            if use_grid:
+                best_score = np.max(results)
+                for layer_1 in range(len(results)):
+                    for layer_2 in range(len(results[layer_1])):
+                        if results[layer_1][layer_2] == best_score:
+                            print("\n")
+                            print("Best date: {},{}".format((layer_1+1)*2, layer_2))
+                            print("With Score: {}".format(results[layer_1][layer_2]))
+
+                results/=np.max(best_score)
+                fig = plt.figure(figsize=(8, 4))
+
+                ax = fig.add_subplot(111)
+
+                ax.set_title('colorMap')
+                plt.imshow(results)
+                ax.set_aspect('equal')
+
+                cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
+                cax.get_xaxis().set_visible(False)
+                cax.get_yaxis().set_visible(False)
+                cax.patch.set_alpha(0)
+                cax.set_frame_on(False)
+                plt.show()
+            return
+
+        elif self.testmode == "date":
+            self.data.load_culture_data(self.filename)
+
+            max_date = 14
+            min_date = 1
+            results = [[0 for _ in range(max_date)] for _ in range(min_date)]
+            score = []
+            sensitivity = []
+            specificity = []
+            sensitivity_variance = []
+            specificity_variance = []
+            x_axis = []
+
+            print("Beginning date iteration")
+            for min_month in range(0, min_date):
                 
                 for max_month in range(0, max_date):
                     if max_month < min_month: continue
@@ -141,42 +261,94 @@ class Perceptron():
                     self.data.load_filtered_esbl_patient_data()
 
                     self.pos_training_data = self.data.esbl_pos_patient_data
-                    if len(self.pos_training_data) < 16: continue
+                    if len(self.pos_training_data) < 10: continue
                     self.neg_training_data = self.data.esbl_neg_patient_data
-                    
+
+
                     pos_predictor_result, neg_predictor_result = self.run_cross_validation()
 
                     print("Average accuracy of Esbl pos: " + str(np.average(pos_predictor_result)))
                     print("Average accuracy of Esbl neg: " + str(np.average(neg_predictor_result)))
 
+                    # Grid results
                     # results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result)*len(self.pos_training_data))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
                     results[min_month][max_month] = (np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1)
 
+                    # Graph results
+                    score.append((np.average(pos_predictor_result)*np.average(neg_predictor_result))/(np.std(pos_predictor_result)*np.std(neg_predictor_result)+1))
+                    sensitivity.append(np.mean(pos_predictor_result))
+                    specificity.append(np.mean(neg_predictor_result))
+                    sensitivity_variance.append(np.std(pos_predictor_result))
+                    specificity_variance.append(np.std(neg_predictor_result))
+                    x_axis.append(max_month)
 
-            best_score = np.max(results)
-            for layer_1 in range(len(results)):
-                for layer_2 in range(len(results[layer_1])):
-                    if results[layer_1][layer_2] == best_score:
-                        print("\n")
-                        print("Best date: {},{}".format((layer_1+1)*2, layer_2))
-                        print("With Score: {}".format(results[layer_1][layer_2]))
+            use_graph = True
+            use_grid = False
+            if use_graph:
+                print(score)
+                def sliding_mean(data_array, window=5):  
+                    data_array = array(data_array)  
+                    new_list = []  
+                    for i in range(len(data_array)):  
+                        indices = range(max(i - window + 1, 0),  
+                                        min(i + window + 1, len(data_array)))  
+                        avg = 0  
+                        for j in indices:  
+                            avg += data_array[j]  
+                        avg /= float(len(indices))  
+                        new_list.append(avg)  
+                          
+                    return array(new_list)  
+ 
+                plt.figure(figsize=(12, 9))  
+                  
+                ax = plt.subplot(111)  
+                ax.spines["top"].set_visible(False)  
+                ax.spines["right"].set_visible(False)  
+                  
+                ax.get_xaxis().tick_bottom()  
+                ax.get_yaxis().tick_left()  
 
-            results/=np.max(best_score)
-            fig = plt.figure(figsize=(6, 3.2))
+                plt.ylim(0, 1)  
 
-            ax = fig.add_subplot(111)
+                plt.xticks(fontsize=14)  
+                plt.yticks(fontsize=14)  
 
-            ax.set_title('colorMap')
-            plt.imshow(results)
-            ax.set_aspect('equal')
+                plt.ylabel("Score", fontsize=16)  
+                  
 
-            cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
-            cax.get_xaxis().set_visible(False)
-            cax.get_yaxis().set_visible(False)
-            cax.patch.set_alpha(0)
-            cax.set_frame_on(False)
-            plt.colorbar(orientation='vertical')
-            plt.show()
+                plt.plot(x_axis, sensitivity, color="blue", lw=2)
+                plt.plot(x_axis, specificity, color="green", lw=2)
+                plt.plot(x_axis, score, color="red", lw=2)
+                plt.title("", fontsize=22)  
+                plt.xlabel("\nAge of cultures", fontsize=10)  
+                  
+                plt.show()
+
+            if use_grid:
+                best_score = np.max(results)
+                for layer_1 in range(len(results)):
+                    for layer_2 in range(len(results[layer_1])):
+                        if results[layer_1][layer_2] == best_score:
+                            print("\n")
+                            print("Best date: {},{}".format((layer_1+1)*2, layer_2))
+                            print("With Score: {}".format(results[layer_1][layer_2]))
+
+                results/=np.max(best_score)
+                fig = plt.figure(figsize=(8, 4))
+
+                ax = fig.add_subplot(111)
+
+                ax.set_title('colorMap')
+                plt.imshow(results)
+                ax.set_aspect('equal')
+
+                cax = fig.add_axes([0.12, 0.1, 0.78, 0.8])
+                cax.get_xaxis().set_visible(False)
+                cax.get_yaxis().set_visible(False)
+                cax.patch.set_alpha(0)
+                cax.set_frame_on(False)
+                plt.show()
             return
 
         if self.analysis_type=="culture" and self.testmode != "date":
@@ -192,7 +364,7 @@ class Perceptron():
                 print("Medication file not set")
                 return
             self.data.load_patient_data(self.filename, self.medication_file)
-            self.pos_training_data, self.neg_training_data = process_data.vectorize_culture_data(self.data.patient_dict)
+            self.pos_training_data, self.neg_training_data = process_data.vectorize_medication_data(self.data.patient_dict)
         else:
             print("Invalid analysis type")
             return
